@@ -179,6 +179,7 @@ return [
         // Add Plus
         Collective\Html\HtmlServiceProvider::class,
         Laratrust\LaratrustServiceprovider::class,
+        Yajra\Datatables\DatatablesServiceProvider::class,
     ],
 
     /*
