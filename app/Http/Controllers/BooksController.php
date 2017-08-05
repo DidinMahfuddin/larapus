@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use App\Book;
-use Session;
 use Yajra\Datatables\Html\Builder;
 use Yajra\Datatables\Datatables;
+use App\Http\Requests\StoreBookRequest;
+use App\Http\Requests\UpdateBookRequest;
 
 class BooksController extends Controller
 {
@@ -58,9 +61,26 @@ class BooksController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(StoreBookRequest $request)
     {
         //
+        
+        $book = Book::create($request->except('cover'));
+
+        if ($request->hasFile('cover')) {
+            $uploaded_cover = $request->file('cover');
+            $extension = $uploaded_cover->getClientOriginalExtension();
+            $filename = md5(time()).'.'.$extension;
+            $destinationPath = public_path().DIRECTORY_SEPARATOR.'img';
+            $uploaded_cover->move($destinationPath,$filename);
+            $book->cover = $filename;
+            $book->save();
+        }
+        Session::flash("flash_notification",[
+            "level"=>"success",
+            "message"=>"Berhasil Menyimpan $book->title"
+            ]);
+        return redirect()->route('books.index');
     }
 
     /**
@@ -83,6 +103,8 @@ class BooksController extends Controller
     public function edit($id)
     {
         //
+        $book = Book::find($id);
+        return view('books.edit')->with(compact('book'));
     }
 
     /**
@@ -92,9 +114,40 @@ class BooksController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(UpdateBookRequest $request, $id)
     {
         //
+        
+        $book = Book::find($id);
+        $book->update($request->all());
+
+        if ($request->hasFile('cover')) {
+            $filename = null;
+            $uploaded_cover = $request->file('cover');
+            $extension = $uploaded_cover->getClientOriginalExtension();
+            $filename = md5(time()).'.'.$extension;
+            $destinationPath = public_path().DIRECTORY_SEPARATOR.'img';
+            $uploaded_cover->move($destinationPath,$filename);
+
+            if ($book->cover) {
+                $old_cover = $book->cover;
+                $filepath = public_path().DIRECTORY_SEPARATOR.'img'.DIRECTORY_SEPARATOR.$book->cover;
+
+                try {
+                    File::delete($filepath);
+                } catch (FileNotFoundException $e) {
+                    //File sudah dihapus/tidak ada
+                }
+            }
+
+            $book->cover = $filename;
+            $book->save();
+        }
+        Session::flash("flash_notification",[
+            "level"=>"success",
+            "message"=>"Berhasil Menyimpan $book->title"
+            ]);
+        return redirect()->route('books.index');   
     }
 
     /**
@@ -106,5 +159,25 @@ class BooksController extends Controller
     public function destroy($id)
     {
         //
+        $book = Book::find($id);
+
+        if ($book->cover) {
+            $old_cover = $book->cover;
+            $filepath = public_path() . DIRECTORY_SEPARATOR.'img'.DIRECTORY_SEPARATOR . $book->cover;
+
+            try {
+                File::delete($filepath);
+            } catch (FileNotFoundException $e) {
+                //File sudah dihapus tidak ada
+            }
+        }
+
+        $book->delete();
+
+        Session::flash("flash_notification",[
+            "level"=>"success",
+            "message"=>"Buku berhasil dihapus"
+            ]);
+        return redirect()->route('books.index');
     }
 }
